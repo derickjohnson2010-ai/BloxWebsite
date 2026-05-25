@@ -776,6 +776,7 @@ function requestListingChat(itemId, sellerName, itemName) {
 }
 
 function renderListingChat(chat, item) {
+  state._activeListingChatId = chat.id;
   const chatArea = document.getElementById('listingChatArea');
   chatArea.innerHTML = `
     <div class="chat-container" id="listingChatContainer">
@@ -788,17 +789,17 @@ function renderListingChat(chat, item) {
       </div>
       <div class="chat-messages" id="listingChatMsgs"></div>
       <div class="chat-input-row">
-        <input class="chat-input" id="listingChatInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendListingMsg('${chat.id}')"/>
-        <button class="chat-send-btn" onclick="sendListingMsg('${chat.id}')">Send</button>
+        <input class="chat-input" id="listingChatInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendListingMsg()"/>
+        <button class="chat-send-btn" onclick="sendListingMsg()">Send</button>
       </div>
     </div>`;
   renderChatMessages('listingChatMsgs', chat.messages);
 }
 
-function sendListingMsg(chatId) {
+function sendListingMsg() {
   const input = document.getElementById('listingChatInput');
   const text = input.value.trim(); if (!text) return;
-  const chat = state.tickets.find(t => t.id === chatId);
+  const chat = state.tickets.find(t => t.id === state._activeListingChatId);
   if (!chat) return;
   chat.messages.push({ from: state.user.username, fromId: state.user.id, text, time: now() });
   save(); input.value = '';
@@ -848,6 +849,7 @@ function renderSupportChatList() {
 
 function openSupportChat(chatId) {
   state.activeSupportChat = chatId;
+  state._activeSupportChatId = chatId;
   const chat = state.tickets.find(t => t.id === chatId);
   if (!chat) return;
   renderSupportChatList();
@@ -860,20 +862,20 @@ function openSupportChat(chatId) {
         <div class="chat-header-sub">Ticket #${String(chat.id).slice(-5)} · ${chat.date}</div>
       </div>
       <span class="role-badge ${chat.status==='open'?'role-seller':'role-user'}">${chat.status}</span>
-      ${isStaff(state.user) && chat.status==='open' ? `<button class="btn btn-ghost btn-sm" style="margin-left:0.5rem" onclick="closeSupportTicket(${chat.id})">Close</button>`:``}
+      ${isStaff(state.user) && chat.status==='open' ? `<button class="btn btn-ghost btn-sm" style="margin-left:0.5rem" onclick="closeSupportTicket()">Close</button>`:''}
     </div>
     <div class="chat-messages" id="supportChatMsgs" style="flex:1"></div>
     ${chat.status==='open'?`<div class="chat-input-row">
-      <input class="chat-input" id="supportChatInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendSupportMsg(${chat.id})"/>
-      <button class="chat-send-btn" onclick="sendSupportMsg(${chat.id})">Send</button>
+      <input class="chat-input" id="supportChatInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendSupportMsg()"/>
+      <button class="chat-send-btn" onclick="sendSupportMsg()">Send</button>
     </div>`:`<div style="padding:0.75rem 1rem;text-align:center;font-size:0.8rem;color:var(--muted);border-top:1px solid var(--border)">This ticket is closed</div>`}`;
   renderChatMessages('supportChatMsgs', chat.messages);
 }
 
-function sendSupportMsg(chatId) {
+function sendSupportMsg() {
   const input = document.getElementById('supportChatInput');
   const text = input.value.trim(); if (!text) return;
-  const chat = state.tickets.find(t => t.id === chatId); if (!chat) return;
+  const chat = state.tickets.find(t => t.id === state._activeSupportChatId); if (!chat) return;
   chat.messages.push({ from: state.user.username, fromId: state.user.id, text, time: now() });
   save(); input.value = '';
   renderChatMessages('supportChatMsgs', chat.messages);
@@ -881,10 +883,10 @@ function sendSupportMsg(chatId) {
   renderAdminTickets();
 }
 
-function closeSupportTicket(chatId) {
-  const chat = state.tickets.find(t => t.id === chatId); if (!chat) return;
+function closeSupportTicket() {
+  const chat = state.tickets.find(t => t.id === state._activeSupportChatId); if (!chat) return;
   chat.status = 'closed'; save();
-  openSupportChat(chatId); renderSupportChatList(); renderAdminTickets();
+  openSupportChat(state._activeSupportChatId); renderSupportChatList(); renderAdminTickets();
   toast('Ticket closed.');
 }
 
@@ -958,12 +960,10 @@ function renderAdminTickets() {
   }).join('')}</div>`;
 }
 
-// Admin opens a support chat inline
-let adminActiveChatId = null;
 function adminOpenChat(chatId) {
   adminActiveChatId = chatId;
+  state._activeAdminChatId = chatId;
   const chat = state.tickets.find(t => t.id === chatId); if (!chat) return;
-  // Show a modal-like inline panel
   const el = document.getElementById('admin-tickets');
   el.innerHTML = `
     <button class="btn btn-ghost btn-sm" style="margin-bottom:1rem" onclick="renderAdminTickets()">← Back to All Chats</button>
@@ -975,32 +975,31 @@ function adminOpenChat(chatId) {
           <div class="chat-header-sub">User: ${chat.userName} · #${String(chat.id).slice(-5)}</div>
         </div>
         <span class="role-badge ${chat.status==='open'?'role-seller':'role-user'}">${chat.status}</span>
-        ${chat.status==='open'?`<button class="btn btn-ghost btn-sm" style="margin-left:0.5rem" onclick="closeAdminChat(${chat.id})">Close Ticket</button>`:''}
+        ${chat.status==='open'?`<button class="btn btn-ghost btn-sm" style="margin-left:0.5rem" onclick="closeAdminChat()">Close Ticket</button>`:''}
       </div>
       <div class="chat-messages" id="adminChatMsgs"></div>
       ${chat.status==='open'?`<div class="chat-input-row">
-        <input class="chat-input" id="adminChatInput" placeholder="Reply as support..." onkeydown="if(event.key==='Enter')sendAdminMsg(${chat.id})"/>
-        <button class="chat-send-btn" onclick="sendAdminMsg(${chat.id})">Send</button>
+        <input class="chat-input" id="adminChatInput" placeholder="Reply as support..." onkeydown="if(event.key==='Enter')sendAdminMsg()"/>
+        <button class="chat-send-btn" onclick="sendAdminMsg()">Send</button>
       </div>`:`<div style="padding:0.75rem;text-align:center;font-size:0.8rem;color:var(--muted);border-top:1px solid var(--border)">Ticket closed</div>`}
     </div>`;
   renderChatMessages('adminChatMsgs', chat.messages);
 }
 
-function sendAdminMsg(chatId) {
+function sendAdminMsg() {
   const input = document.getElementById('adminChatInput');
   const text = input.value.trim(); if (!text) return;
-  const chat = state.tickets.find(t => t.id === chatId); if (!chat) return;
+  const chat = state.tickets.find(t => t.id === state._activeAdminChatId); if (!chat) return;
   chat.messages.push({ from: state.user.username+' (Support)', fromId: state.user.id, text, time: now() });
   save(); input.value = '';
   renderChatMessages('adminChatMsgs', chat.messages);
-  // Also update support side if viewing
   if (document.getElementById('supportChatMsgs')) renderChatMessages('supportChatMsgs', chat.messages);
 }
 
-function closeAdminChat(chatId) {
-  const chat = state.tickets.find(t => t.id === chatId); if (!chat) return;
+function closeAdminChat() {
+  const chat = state.tickets.find(t => t.id === state._activeAdminChatId); if (!chat) return;
   chat.status = 'closed'; save();
-  adminOpenChat(chatId);
+  adminOpenChat(state._activeAdminChatId);
 }
 
 // Owner tickets tab
@@ -1024,6 +1023,7 @@ function renderOwnerTickets() {
 }
 
 function ownerOpenChat(chatId) {
+  state._activeOwnerChatId = chatId;
   const chat = state.tickets.find(t => t.id === chatId); if (!chat) return;
   const el = document.getElementById('ownerTicketsContent');
   el.innerHTML = `
@@ -1036,30 +1036,30 @@ function ownerOpenChat(chatId) {
           <div class="chat-header-sub">User: ${chat.userName} · #${String(chat.id).slice(-5)}</div>
         </div>
         <span class="role-badge ${chat.status==='open'?'role-seller':'role-user'}">${chat.status}</span>
-        ${chat.status==='open'?`<button class="btn btn-ghost btn-sm" style="margin-left:0.5rem" onclick="ownerCloseChat(${chat.id})">Close</button><button class="btn btn-danger btn-sm" style="margin-left:0.25rem" onclick="deleteTicket(${chat.id})">Delete</button>`:''}
+        ${chat.status==='open'?`<button class="btn btn-ghost btn-sm" style="margin-left:0.5rem" onclick="ownerCloseChat()">Close</button><button class="btn btn-danger btn-sm" style="margin-left:0.25rem" onclick="deleteTicket(${chat.id});renderOwnerTickets()">Delete</button>`:''}
       </div>
       <div class="chat-messages" id="ownerChatMsgs"></div>
       ${chat.status==='open'?`<div class="chat-input-row">
-        <input class="chat-input" id="ownerChatInput" placeholder="Reply as Owner..." onkeydown="if(event.key==='Enter')sendOwnerMsg(${chat.id})"/>
-        <button class="chat-send-btn" onclick="sendOwnerMsg(${chat.id})">Send</button>
+        <input class="chat-input" id="ownerChatInput" placeholder="Reply as Owner..." onkeydown="if(event.key==='Enter')sendOwnerMsg()"/>
+        <button class="chat-send-btn" onclick="sendOwnerMsg()">Send</button>
       </div>`:`<div style="padding:0.75rem;text-align:center;font-size:0.8rem;color:var(--muted);border-top:1px solid var(--border)">Ticket closed</div>`}
     </div>`;
   renderChatMessages('ownerChatMsgs', chat.messages);
 }
 
-function sendOwnerMsg(chatId) {
+function sendOwnerMsg() {
   const input = document.getElementById('ownerChatInput');
   const text = input.value.trim(); if (!text) return;
-  const chat = state.tickets.find(t => t.id === chatId); if (!chat) return;
+  const chat = state.tickets.find(t => t.id === state._activeOwnerChatId); if (!chat) return;
   chat.messages.push({ from: '👑 '+state.user.username, fromId: state.user.id, text, time: now() });
   save(); input.value = '';
   renderChatMessages('ownerChatMsgs', chat.messages);
   if (document.getElementById('supportChatMsgs')) renderChatMessages('supportChatMsgs', chat.messages);
 }
 
-function ownerCloseChat(chatId) {
-  const chat = state.tickets.find(t=>t.id===chatId); if(!chat) return;
-  chat.status='closed'; save(); ownerOpenChat(chatId);
+function ownerCloseChat() {
+  const chat = state.tickets.find(t=>t.id===state._activeOwnerChatId); if(!chat) return;
+  chat.status='closed'; save(); ownerOpenChat(state._activeOwnerChatId);
 }
 
 // ─── LISTINGS MANAGEMENT ─────────────────────────────────────────────────────
